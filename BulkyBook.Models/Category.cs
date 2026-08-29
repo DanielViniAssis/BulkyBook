@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+using System.ComponentModel.DataAnnotations;
 
 namespace BulkyBook.Models
 {
@@ -9,9 +10,12 @@ namespace BulkyBook.Models
 
         [Required]
         [StringLength(100)]
+        [Display(Name = "Category Name")]
         public string Name { get; set; } = String.Empty;
 
         [Range(0,100,ErrorMessage ="Range must be between 0 and 100!!")]
+        //[ValidateNever]
+        [Display(Name = "Display Order")]
         public int? DisplayOrder { get; set; }
     }
 }
