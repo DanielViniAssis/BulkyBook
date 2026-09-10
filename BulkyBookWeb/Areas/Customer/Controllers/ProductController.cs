@@ -12,10 +12,12 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
     public class ProductController : Controller
     {
         private readonly IProductService _productService;
+        private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly ICategoryService _categoryService;
-        public ProductController(IProductService productService, ICategoryService categoryService)
+        public ProductController(IProductService productService, ICategoryService categoryService, IWebHostEnvironment webHostEnvironment)
         {
             _productService = productService;
+            _webHostEnvironment = webHostEnvironment;
             _categoryService = categoryService;
         }
 
@@ -24,7 +26,7 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
             return View();
         }
 
-        public async Task<IActionResult> Upsert()
+        public async Task<IActionResult> Upsert(int? id)
         {
             var categories = await _categoryService.GetAllCategoriesAsync();
 
@@ -38,22 +40,72 @@ namespace BulkyBookWeb.Areas.Customer.Controllers
                 Product = new Product()
             };
 
-            return View(productVM);
+            if(id == null || id == 0)
+            {
+                return View(productVM);
+            }
+            else
+            {
+                productVM.Product = await _productService.GetProductByIdAsync(id.Value);
+                return View(productVM);
+            }
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         [ActionName("Upsert")]
-        public async Task <IActionResult> UpsertPOST(Product product, IFormFile? file)
+        public async Task <IActionResult> UpsertPOST(ProductVM productVM, IFormFile? file)
         {
             if (ModelState.IsValid)
             {
-                //await _productService.CreateProductAsync(product);
+                string wwwRootPath = _webHostEnvironment.WebRootPath;
 
-                TempData["success"] = "Product created successfully!";
+                if (file != null)
+                {
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                    string productPath = Path.Combine("images", "products");
+                    string finalPath = Path.Combine(wwwRootPath, productPath);
+
+                    if (!Directory.Exists(finalPath))
+                    {
+                        Directory.CreateDirectory(finalPath);
+                    }
+
+                    using (var fileStream = new FileStream(Path.Combine(finalPath, fileName), FileMode.Create))
+                    {
+                        file.CopyTo(fileStream);
+                    }
+
+                    productVM.Product.ImageUrl = Path.Combine(@"\", productPath, fileName).Replace("\\", "/");
+
+                }
+
+                if (productVM.Product.Id == null || productVM.Product.Id == 0)
+                {
+                    await _productService.CreateProductAsync(productVM.Product);
+                    TempData["success"] = "Product created successfully!";
+                }
+                else
+                {
+                    await _productService.UpdateProductAsync(productVM.Product);
+                }
+
                 return RedirectToAction("Index");
             }
-            return View();
+            else
+            {
+                var categories = await _categoryService.GetAllCategoriesAsync();
+
+                productVM = new()
+                {
+                    CategoryList = categories.Select(c => new SelectListItem
+                    {
+                        Text = c.Name,
+                        Value = c.Id.ToString()
+                    }),
+                };
+                return View(productVM);
+            }
         }
 
         public async Task<IActionResult> Delete(int? id)
